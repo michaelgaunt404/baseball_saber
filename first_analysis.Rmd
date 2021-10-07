@@ -1,0 +1,123 @@
+---
+title: "Inital Baseball Exploration"
+subtitle: "Subtitle"
+author: "Mike Gaunt"
+date: "`r Sys.Date()`"
+output: github_document
+knit: (function(inputFile, encoding) { rmarkdown::render(inputFile, encoding = encoding, output_file = paste0(substr(inputFile,1,nchar(inputFile)-4),Sys.Date(),'.html')) })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  cache = FALSE, cache.lazy = FALSE, autodep = TRUE, warning = FALSE, 
+  message = FALSE, echo = TRUE, dpi = 180,
+  fig.width = 8, fig.height = 5, echo = FALSE
+  )
+```
+
+```{r include=FALSE}
+#library set-up=================================================================
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+library(tidyverse)
+library(data.table) #robust DF operations for bigger data sizes
+library(baseballr) #convenience functions for scraping data and making some stats
+library(tictoc) #for function benchmarking
+library(furrr)
+```
+
+```{r include=FALSE}
+#file sourcing==================================================================
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# list(
+#   "source_1.R",
+#   "source_2.R"
+# ) %>%  
+#   map(~here(.x) %>% 
+#         source())
+```
+
+```{r include=FALSE}
+#data set-up====================================================================
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#excluding this section here because getting the data and transfroming it is the main intent of this document
+```
+
+```{r}
+#var defintion==================================================================
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+```{r}
+#custom function defintion======================================================
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+
+# Introduction/Summary
+
+This markdown explores the baseballR package and the data that can be acquired though it.
+  
+# Intended Work Flow
+
+```{r}
+scrape_start_date = "2021-04-01"
+scrape_end_date = Sys.Date()
+```
+
+```{r}
+date_list = seq(from = as.Date(scrape_start_date)+1, to = scrape_end_date, by = 1) %>%
+  map(~.x %>%  as.character)
+```
+
+The result is a list of end dates that the scrape data will be scraped to. Below is the first six inputs for that scrape. 
+```{r}
+date_list %>%  head()
+```
+
+This list will then be 
+```{r}
+tic()
+date_list %>%  
+  head(10) %>% 
+  map(~daily_batter_bref(scrape_start_date, .x ))
+toc()
+```
+
+```{r}
+plan(multisession, workers = 4)
+
+tic()
+date_list %>%  
+  head(10) %>% 
+  future_map(~daily_batter_bref(scrape_start_date, .x ))
+toc()
+```
+
+```{r}
+batting_data = date_list %>%  
+  future_map(~daily_batter_bref(scrape_start_date, .x ))
+```
+
+```{r}
+
+tmp = batting_data %>%  
+  map(~woba_plus(.x))
+
+batting_data_woba = list(batting_data, date_list) %>%
+  pmap(~.x %>%  
+        mutate(as_of = .y) %>%  
+         woba_plus)
+
+batting_data_total = batting_data_woba %>%  
+  rbindlist()
+```
+
+
+```{r}
+batting_data_total %>% 
+  # .[Name == "Pablo Sandoval", ] %>%  
+  .[, .SD[max(SLG) < .3], by = .(Name)] %>% 
+  ggplot() + 
+  geom_line(aes(as.Date(as_of), SLG, group = Name), alpha = .1)
+```
+

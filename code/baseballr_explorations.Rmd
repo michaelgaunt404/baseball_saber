@@ -1,0 +1,356 @@
+---
+title: "Sabermetrics Demo `r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## GitHub Documents
+
+This is an R Markdown format used for publishing markdown documents to GitHub. When you click the **Knit** button all R code chunks are run and a markdown file (.md) suitable for publishing to GitHub is generated.
+
+## Including Code
+
+You can include R code in the document as follows:
+
+```{r cars}
+# install.packages("devtools")
+library(baseballr)
+library(tidyverse)
+library(lubridate)
+library(data.table)
+library(furrr)
+plan(multisession, workers = 4)
+```
+
+```{r}
+start_date = "2021-04-01"
+```
+
+```{r}
+date_list = seq(from = as.Date(start_date)+1, to = Sys.Date(), by = 1) %>%
+  map(~.x %>%  as.character)
+```
+
+```{r}
+saveRDS(daily_batter_data, here::here("data/daily_batter_data.RDS"))
+
+daily_batter_data = date_list %>%  
+  future_map(~daily_batter_bref(start_date, .x ) %>%  
+               data.table()) %>%  
+  list(., date_list) %>%
+  pmap(~.x %>%  
+        .[,`:=`(as_of = .y %>%  
+                  as.Date())] %>%  
+         woba_plus() %>%  
+         data.table()) %>%  
+  rbindlist() %>% 
+  .[order(Team, Name, PA)]
+
+ tmp = tmp[as_of %ni% seq( Sys.Date()-7, Sys.Date(), 1)]
+
+ 
+ 
+
+
+update_daily_batter()
+
+
+```
+
+
+
+```{r}
+daily_batter_data = daily_batter_data %>%  
+  rbindlist() %>% 
+  .[order(Team, Name, PA)]
+
+
+date_data2 = list(date_data, date_list) %>%
+  pmap(~.x %>%  
+        .[,`:=`(as_of = .y %>%  
+                  as)] )
+
+daily_batter_data[[2]] %>%  
+  .[Name == "José Abreu"] %>%  
+  bind_rows(daily_batter_data[[40]] %>%  
+  .[Name == "José Abreu"])
+
+daily_batter_data %>%
+  rbindlist() %>% 
+  .[,`:=`(as_of = as_of %>%  
+                  as.Date())] %>% 
+  # .[Team == "Oakland"] %>% 
+  .[order(Team, Name, PA)] %>% 
+  .[,`:=`(H_cum = cumsum(H)), by = "Name"] %>% 
+  ggplot() + 
+  geom_line(aes(as_of, wOBA-lag(wOBA), group = Name), alpha = .1) +
+  # scale_x_date(limits = as.Date(c('2021-05-14','2021-05-21')))
+  coord_cartesian(xlim = c(Sys.Date()-7, NA), 
+                  ylim = c(-.2, .2)) 
+
+daily_batter_data %>%
+  rbindlist() %>% 
+  .[,`:=`(as_of = as_of %>%  
+                  as.Date())] %>% 
+  # .[Team == "Oakland"] %>% 
+  .[order(Team, Name, PA)] %>% 
+  .[,`:=`(H_cum = cumsum(H)), by = "Name"] %>% 
+  ggplot() + 
+  geom_line(aes(as_of, wOBA, group = Name), alpha = .1) +
+  # scale_x_date(limits = as.Date(c('2021-05-14','2021-05-21')))
+  coord_cartesian(xlim = c(Sys.Date()-7, NA), 
+                   ylim = c(.2, .5)) 
+  
+  
+  head()
+days(1)
+data %>%  
+  filter(Team == "Oakland") %>%
+  woba_plus %>%
+  arrange(desc(wOBA)) %>%
+  select(Name, Team, season, PA, wOBA, wOBA_CON) %>%
+  head()
+```
+
+```{r}
+correa <- scrape_statcast_savant(start_date = "2016-04-06",
+  end_date = "2016-04-15", playerid = 621043)
+
+scrape_statcast_savant_batter(start_date = "2016-04-06",
+  end_date = "2016-04-15", batterid = 621043)
+
+tictoc::tic()
+big_batter_data = scrape_statcast_savant_batter_all(start_date = "2021-04-01",
+  end_date = Sys.Date())
+tictoc::toc()
+```
+
+```{r}
+
+select_index = c("game_date", "player_name", "pitcher", "at_bat_number", "events", "bb_type")
+
+at_bat_data = big_batter_data %>%  
+  data.table() %>% 
+  .[, .SD[which.max(pitch_number)], by  = .(game_date, player_name, batter, pitcher, at_bat_number)] %>%  
+  .[order(player_name, at_bat_number), ..select_index]  %>%  
+  .[,`:=`(hit = fct_recode(events,
+                           hit = "home_run",
+                           hit = "single",
+                           hit = "double",
+                           hit = "triple") %>%  
+            fct_other(keep = "hit", other_level = "not_hit"))]
+
+
+at_bat_data
+
+
+at_bat_data %>%  
+  .[, !c("events", "bb_type")] 
+
+daily_batter_data %>%  
+  glimpse()
+  
+daily_batter_data %>%  
+  group_by(Name) %>% 
+  mutate(
+    across(cummlative_batting_index, cumsum)
+  ) %>%
+  select(Name, G, PA, AB)
+
+alpha0 <- m$estimate[1]
+beta0 <- m$estimate[2]
+
+
+  
+data = daily_batter_data %>%  
+  .[,.(Name, PA, AB, H, BA, as_of)] %>%  
+  .[, .SD[max(AB)>50], by = .(Name)] %>% 
+  .[!is.na(BA) & !is.infinite(BA),]
+
+ggplot(data) + 
+  geom_density(aes(BA))
+m = data %>%  
+  .[, .SD[which.max(AB)], by = .(Name)] %>%  
+  .$BA %>%  
+ MASS::fitdistr(., "beta",
+                    start = list(shape1 = 2, shape2 = 3))
+
+alpha0 <- m$estimate[1][[1]]
+beta0 <- m$estimate[2][[1]]
+
+data %>%  
+  .[,`:=`(eb = (H + alpha0) / (AB + alpha0 + beta0), 
+          as_of = as_of %>%  as.Date())] %>%  
+  filter(Name == "David Peralta") %>%  
+  ggplot() + 
+  geom_line(aes(as_of, BA)) +
+  geom_line(aes(as_of, eb), color = "blue") + 
+  geom_hline(yintercept = alpha0/(alpha0+beta0))
+
+```
+
+
+
+
+```{r}
+url_base <- "http://gd2.mlb.com/components/game/mlb/"
+url <- paste0(url_base, "year_2018/month_05/day_21/gid_2016_05_21_milmlb_nynmlb_1/boxscore.xml")
+batter_boxscore(url)
+```
+
+```{r}
+pitcher_game_logs_fg(playerid = 104, year = 2006)
+```
+
+
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+# install.packages("ebbr")
+# devtools::install_github("dgrtwo/ebbr")
+library(Lahman)
+library(VGAM)
+
+# Filter out pitchers
+career <- Batting %>%
+filter(AB > 0) %>%
+anti_join(Pitching, by = "playerID") %>%
+group_by(playerID) %>%
+summarize(H = sum(H), AB = sum(AB)) %>%
+mutate(average = H / AB)
+# Include names along with the player IDs
+career <- Master %>%
+tbl_df() %>%
+dplyr::select(playerID, nameFirst, nameLast) %>%
+unite(name, nameFirst, nameLast, sep = " ") %>%
+inner_join(career, by = "playerID") %>%
+dplyr::select(-playerID)
+
+library(stats4)
+career_filtered <- career %>%
+filter(AB > 500)
+# log-likelihood function
+ll <- function(alpha, beta) {
+x <- career_filtered$H
+total <- career_filtered$AB
+-sum(VGAM::dbetabinom.ab(x, total, alpha, beta, log = TRUE))
+}
+
+m <- mle(ll, start = list(alpha = 1, beta = 10), method = "L-BFGS-B",
+lower = c(0.0001, .1))
+ab <- coef(m)
+alpha0 <- ab[1]
+beta0 <- ab[2]
+
+career_eb <- career %>%
+mutate(eb_estimate = (H + alpha0) / (AB + alpha0 + beta0)) %>%  
+  bind_cols(., fit = augment(fit)$.fitted)
+
+career_eb %>%  
+  ggplot() + 
+  geom_point(aes(average, eb_estimate,  color = AB)) + 
+  coord_cartesian(xlim = c(0, 1), 
+                  ylim = c(0, 1))
+
+
+library(ebbr)
+
+fit = career_eb %>%
+  ebb_fit_prior(H, AB, method = "gamlss")
+
+career = career %>%
+mutate(eb_estimate = (H + alpha0) / (AB + alpha0 + beta0)) %>%  
+  bind_cols(., fit_gam = augment(fit)$.fitted)
+
+
+make_eb = function(data, success, total, method = "mle"){
+  bind_cols(
+    data, 
+  fitted = data %>%  
+    ebb_fit_prior(x = !!success, n = !!total, method = method) %>%  
+    augment() %>% 
+    .$.fitted
+  )
+}
+
+f <- expr(foo)
+expr((!!f)(x, y))
+as.symbol(success)
+success = "H"
+total = "AB"
+
+eval(H, data)
+
+career_eb %>%
+  make_eb(., success = "H", "AB")
+
+mtcars %>%  
+    ebb_fit_prior(x = mpg, n = hp, method = method) 
+
+data %>%  
+    ebb_fit_prior(x = ~success, n = ~total, method = method)
+
+career %>%  
+  mutate(index = row_number()) %>% 
+  select(!c(H, AB)) %>%
+  pivot_longer(cols = average:fit_gam, names_to = "yolo") %>%  
+  ggplot() + 
+  geom_boxplot(aes(yolo, value))
+  
+
+
+```
+
+
+```{r}
+library(tidyverse)
+library(Lahman)
+library(ebbr)
+
+career <- Batting %>%
+  filter(AB > 0) %>%
+  anti_join(Pitching, by = "playerID") %>%
+  group_by(playerID) %>%
+  summarize(H = sum(H), AB = sum(AB)) %>%
+  mutate(average = H / AB)
+
+career %>%  
+  ebbr::ebb_fit_prior(H, AB)
+
+#function that i can use to make a bunch of estimates
+make_eb_estimate = function(data, success, total, method = "mle"){
+  # bind_cols(
+  #   data, 
+  fitted = data %>%  
+    ebb_fit_prior(x = {{success}}, n = {{total}}, method = method) %>%  
+    augment() %>% 
+    .$.fitted
+  # )
+}
+data = career
+make_eb_estimate = function(data, success, total, method = "mle"){
+    eb_call = call2(.fn = expr(ebb_fit_prior), 
+                    tbl = (data),
+                    x = as.name(success), # Assuming a character vector
+                    n = as.name(total), # Assuming a character vector
+                    method = method)
+    fitted = eval_tidy(eb_call) %>%  
+      augment() %>%  
+      .$.fitted
+    
+    fitted 
+}
+
+career %>% 
+  make_eb_estimate(data = ., success = "H", total = "AB")
+
+
+career %>%  
+  mutate(eb_estimate = make_eb_estimate(data = .data, success = "H", total = "AB"))
+```
+
